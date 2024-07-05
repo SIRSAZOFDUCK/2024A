@@ -1,18 +1,16 @@
-### Association between deprivation and the prescribing of oral antibacterials in primary care ###
-### Dahiyat S et al. 2024  ###
+### Association between deprivation and the prescribing of smoking cessation items in primary care ###
+### Ahmed A et al. 2024  ###
 
 
 ### Define paths
 
 rm(list=ls()) # Clear environment
 
-path.project <- "C:/Users/sirsa/OneDrive/Documents/2024Dahiyat"
+path.project <- "C:/Users/sirsa/OneDrive/Documents/2024Ahmed"
 path.data.prescribing <- "C:/Users/sirsa/OneDrive/Desktop/Warwick/Research/Data/EPD"
 
 
 ### Load packages -----
-
-#### CONTINUE FROM HERE ####
 
 list.of.packages <- c("data.table", "dplyr","fingertipsR","jsonlite", "crul","janitor", "readxl", "Cairo", "ggplot2", "sandwich", "msm", "stringr")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
@@ -75,7 +73,7 @@ data_epd <- setDT(data_epd)[,.(ITEMS = sum(ITEMS),TOTAL_QUANTITY = sum(TOTAL_QUA
 
 # profiles <- profiles() # Show PHOF profiles. Use to identify which profile set you need. Here we use profile ID 21 [National General Practice Profiles (supporting indicators)]
 
-# inds <- indicators(ProfileID = "21") # Show indicators for selected PHOF profile. Here we use indicator ID 93553 [IMD 2019 score]
+# inds <- indicators(ProfileID = "18") # Show indicators for selected PHOF profile. Here we use indicator ID 93553 [IMD 2019 score]
 
 # areas <- area_types() # Show area types. Here we use area type 7 [General practice]
 
@@ -93,6 +91,24 @@ data_imd <- fingertips_data(IndicatorID = 93553, AreaTypeID = 7) %>% # IMD score
                 "imd.score" = "Value") %>%
   # Keep required columns
   select(practice_code, imd.score)
+
+## Load smoking prevalence data (in 15+ years) by GP practice from Fingertips
+
+data_smoking <- fingertips_data(IndicatorID = 91280, AreaTypeID = 7) %>% # IMD scores by GP practice
+  # Keep IMD(2019) scores only
+  filter(Timeperiod == "2022/23") %>% 
+  # Remove England value
+  filter(AreaType != "England") %>% 
+  # Keep required fields only
+  select(AreaCode, AreaName, ParentName, Value) %>% 
+  # Rename columns
+  dplyr::rename("practice_code" = "AreaCode", 
+                "gp.name" = "AreaName",
+                "pcn.name" = "ParentName",
+                "prop.smoker" = "Value") %>%
+  # Keep required columns
+  select(practice_code, prop.smoker)
+
 
 ## Load practice list size [From catalyst.services.nhsbsa.nhs.uk/analytics]
 
@@ -189,8 +205,10 @@ data_all <- data_all %>%
   mutate(prop.females.quintile = ntile(prop.females,5)) %>%
   # identify older quintiles
   mutate(prop.older.quintile = ntile(prop.older,5)) %>%
+  # identify proportion of smokers quintiles
+  mutate(prop.smoker.quintile = ntile(prop.smoker,5)) %>%
   # keep required columns only
-  select(practice_code, total_list_size, total.females, imd.score, imd.quintile, imd.tertile, imd.decile, items.per.1000, items.per.1000.tertile, total.listsize.quintile, prop.females, prop.females.quintile, prop.older, prop.older.quintile ,items) 
+  select(practice_code, total_list_size, total.females, imd.score, imd.quintile, imd.tertile, imd.decile, items.per.1000, items.per.1000.tertile, total.listsize.quintile, prop.females, prop.females.quintile, prop.older, prop.older.quintile, prop.smoker.quintile, items) 
 
 # Ensure ntiles are categorical (factors)
 data_all$imd.quintile <- as.factor(data_all$imd.quintile)
@@ -199,49 +217,50 @@ data_all$imd.decile <- as.factor(data_all$imd.decile)
 data_all$total.listsize.quintile <- as.factor(data_all$total.listsize.quintile)
 data_all$prop.females.quintile <- as.factor(data_all$prop.females.quintile)
 data_all$prop.older.quintile <- as.factor(data_all$prop.older.quintile)
+data_all$prop.smoker.quintile <- as.factor(data_all$prop.smoker.quintile)
 data_all$items.per.1000.tertile <- as.factor(data_all$items.per.1000.tertile)
 
 
-# Add QOF prevalence data
+# # Add QOF prevalence data
+# 
+# # Read in prevalence data
+# data.qof <- read.csv("qof_prevalence_22_23.csv")
+# 
+# # For each comorbidity included, calculate proportion affected
+# data.copd <- data.qof %>%
+#   filter(GROUP_CODE == "COPD") %>%
+#   mutate(prop.copd = 100 * REGISTER / PRACTICE_LIST_SIZE) %>%
+#   select(PRACTICE_CODE, prop.copd)
+# 
+# data.dm <- data.qof %>%
+#   filter(GROUP_CODE == "DM") %>%
+#   mutate(prop.dm = 100 * REGISTER / PRACTICE_LIST_SIZE) %>%
+#   select(PRACTICE_CODE, prop.dm)
+# 
+# data.hf <- data.qof %>%
+#   filter(GROUP_CODE == "HF") %>%
+#   mutate(prop.hf = 100 * REGISTER / PRACTICE_LIST_SIZE) %>%
+#   select(PRACTICE_CODE, prop.hf)
+# 
+# # COmbine prevalence data and stratify into quintiles
+# data.prevalence <- data.copd %>%
+#   left_join(data.dm, by = "PRACTICE_CODE") %>%
+#   left_join(data.hf, by = "PRACTICE_CODE") %>%
+#   dplyr::rename(practice_code = PRACTICE_CODE) %>%
+#   mutate(prop.copd.quintile = ntile(prop.copd, 5)) %>%
+#   mutate(prop.dm.quintile = ntile(prop.dm, 5)) %>%
+#   mutate(prop.hf.quintile = ntile(prop.hf, 5)) 
+# 
+# # Join to main dataset
+# data_all <- data_all %>%
+#   left_join(data.prevalence, by = "practice_code")
+# 
+# # Ensure all new quintiles are factors
+# data_all$prop.copd.quintile <- as.factor(data_all$prop.copd.quintile)
+# data_all$prop.dm.quintile <- as.factor(data_all$prop.dm.quintile)
+# data_all$prop.hf.quintile <- as.factor(data_all$prop.hf.quintile)
 
-# Read in prevalence data
-data.qof <- read.csv("qof_prevalence_22_23.csv")
-
-# For each comorbidity included, calculate proportion affected
-data.copd <- data.qof %>%
-  filter(GROUP_CODE == "COPD") %>%
-  mutate(prop.copd = 100 * REGISTER / PRACTICE_LIST_SIZE) %>%
-  select(PRACTICE_CODE, prop.copd)
-
-data.dm <- data.qof %>%
-  filter(GROUP_CODE == "DM") %>%
-  mutate(prop.dm = 100 * REGISTER / PRACTICE_LIST_SIZE) %>%
-  select(PRACTICE_CODE, prop.dm)
-
-data.hf <- data.qof %>%
-  filter(GROUP_CODE == "HF") %>%
-  mutate(prop.hf = 100 * REGISTER / PRACTICE_LIST_SIZE) %>%
-  select(PRACTICE_CODE, prop.hf)
-
-# COmbine prevalence data and stratify into quintiles
-data.prevalence <- data.copd %>%
-  left_join(data.dm, by = "PRACTICE_CODE") %>%
-  left_join(data.hf, by = "PRACTICE_CODE") %>%
-  dplyr::rename(practice_code = PRACTICE_CODE) %>%
-  mutate(prop.copd.quintile = ntile(prop.copd, 5)) %>%
-  mutate(prop.dm.quintile = ntile(prop.dm, 5)) %>%
-  mutate(prop.hf.quintile = ntile(prop.hf, 5)) 
-
-# Join to main dataset
-data_all <- data_all %>%
-  left_join(data.prevalence, by = "practice_code")
-
-# Ensure all new quintiles are factors
-data_all$prop.copd.quintile <- as.factor(data_all$prop.copd.quintile)
-data_all$prop.dm.quintile <- as.factor(data_all$prop.dm.quintile)
-data_all$prop.hf.quintile <- as.factor(data_all$prop.hf.quintile)
-
-### Plot data -----
+### Plot data ----- ***** CONTINUE HERE *****
 
 # Function to give SE / CI of data, from http://www.cookbook-r.com/Graphs/Plotting_means_and_error_bars_(ggplot2)/#Helper%20functions
 summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
