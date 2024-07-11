@@ -166,15 +166,15 @@ data_all <- data_all %>%
   mutate(prop.older = 100*total.older/total_list_size)
 
 # Quantify missing data
-missing.items <- data_all %>% filter(items<50)  %>% nrow()
-missing.imd <- data_all %>% filter(items>=50) %>% filter(is.na(imd.score)) %>% nrow()
-missing.listsize <- data_all %>% filter(items>=50) %>% filter(!is.na(imd.score)) %>% filter(is.na(total_list_size)) %>% nrow()
-missing.listsize2 <- data_all %>% filter(items>=50) %>% filter(!is.na(imd.score)) %>% filter(!is.na(total_list_size)) %>% filter(total_list_size < 100) %>% nrow()
+missing.items <- data_all %>% filter(items<10)  %>% nrow()
+missing.imd <- data_all %>% filter(items>=10) %>% filter(is.na(imd.score)) %>% nrow()
+missing.listsize <- data_all %>% filter(items>=10) %>% filter(!is.na(imd.score)) %>% filter(is.na(total_list_size)) %>% nrow()
+missing.listsize2 <- data_all %>% filter(items>=10) %>% filter(!is.na(imd.score)) %>% filter(!is.na(total_list_size)) %>% filter(total_list_size < 100) %>% nrow()
 
 # Remove rows with missing data or low prescribing numbers 
 data_all <- data_all %>% 
   # Remove rows with <50 items prescribed
-  filter(items >= 50) %>%
+  filter(items >= 10) %>%
   # Remove rows with no IMD value
   filter(!is.na(imd.score)) %>%
   # Remove rows with no list size data
@@ -183,7 +183,7 @@ data_all <- data_all %>%
   filter(total_list_size >= 100)
 
 # Print missing data information
-print(paste(missing.items,"practices have fewer than 50 itmes prescribed over the time period"))
+print(paste(missing.items,"practices have fewer than 10 itmes prescribed over the time period"))
 print(paste(missing.imd,"additional practices have no IMD 2019 score"))
 print(paste(missing.listsize,"additional practices have no list size data"))
 print(paste(missing.listsize2,"additional practices with fewer than 100 patients"))
