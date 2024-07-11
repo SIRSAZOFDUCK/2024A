@@ -154,6 +154,8 @@ data_all <- setDT(data_epd)[,.(items = sum(items),total_quantity = sum(total_qua
 data_all <- data_all %>%
   # add IMD data
   left_join(data_imd, by = "practice_code") %>%
+  # add smoking data 
+  left_join(data_smoking, by = "practice_code") %>%
   # add list size data
   left_join(data_listsize, by = "practice_code") %>%
   # calculate items/1000 people
@@ -161,7 +163,7 @@ data_all <- data_all %>%
   # calculate proportion female
   mutate(prop.females = 100*total.females/total_list_size) %>%
   # calculate proportion older people (>55yr)
-  mutate(prop.older = 11*total.older/total_list_size)
+  mutate(prop.older = 100*total.older/total_list_size)
 
 # Quantify missing data
 missing.items <- data_all %>% filter(items<50)  %>% nrow()
@@ -220,45 +222,6 @@ data_all$prop.older.quintile <- as.factor(data_all$prop.older.quintile)
 data_all$prop.smoker.quintile <- as.factor(data_all$prop.smoker.quintile)
 data_all$items.per.1000.tertile <- as.factor(data_all$items.per.1000.tertile)
 
-
-# # Add QOF prevalence data
-# 
-# # Read in prevalence data
-# data.qof <- read.csv("qof_prevalence_22_23.csv")
-# 
-# # For each comorbidity included, calculate proportion affected
-# data.copd <- data.qof %>%
-#   filter(GROUP_CODE == "COPD") %>%
-#   mutate(prop.copd = 100 * REGISTER / PRACTICE_LIST_SIZE) %>%
-#   select(PRACTICE_CODE, prop.copd)
-# 
-# data.dm <- data.qof %>%
-#   filter(GROUP_CODE == "DM") %>%
-#   mutate(prop.dm = 100 * REGISTER / PRACTICE_LIST_SIZE) %>%
-#   select(PRACTICE_CODE, prop.dm)
-# 
-# data.hf <- data.qof %>%
-#   filter(GROUP_CODE == "HF") %>%
-#   mutate(prop.hf = 100 * REGISTER / PRACTICE_LIST_SIZE) %>%
-#   select(PRACTICE_CODE, prop.hf)
-# 
-# # COmbine prevalence data and stratify into quintiles
-# data.prevalence <- data.copd %>%
-#   left_join(data.dm, by = "PRACTICE_CODE") %>%
-#   left_join(data.hf, by = "PRACTICE_CODE") %>%
-#   dplyr::rename(practice_code = PRACTICE_CODE) %>%
-#   mutate(prop.copd.quintile = ntile(prop.copd, 5)) %>%
-#   mutate(prop.dm.quintile = ntile(prop.dm, 5)) %>%
-#   mutate(prop.hf.quintile = ntile(prop.hf, 5)) 
-# 
-# # Join to main dataset
-# data_all <- data_all %>%
-#   left_join(data.prevalence, by = "practice_code")
-# 
-# # Ensure all new quintiles are factors
-# data_all$prop.copd.quintile <- as.factor(data_all$prop.copd.quintile)
-# data_all$prop.dm.quintile <- as.factor(data_all$prop.dm.quintile)
-# data_all$prop.hf.quintile <- as.factor(data_all$prop.hf.quintile)
 
 ### Plot data ----- ***** CONTINUE HERE *****
 
@@ -468,8 +431,8 @@ row.names(table2d)[5] <- "Female Quintile 5" #rename row 5
 
 
 
-# By COPD quintile
-summary(m1 <- glm(items.per.1000 ~ prop.copd.quintile, family="quasipoisson", data=data_all))
+# By smoker quintile
+summary(m1 <- glm(items.per.1000 ~ prop.smoker.quintile, family="quasipoisson", data=data_all))
 cov.m1 <- vcovHC(m1, type="HC0")
 std.err <- sqrt(diag(cov.m1))
 r.est <- cbind(Estimate= coef(m1), "Robust SE" = std.err,
@@ -487,72 +450,21 @@ table2e$LL <- round_any(table2e$LL,0.01)
 table2e$UL <- round_any(table2e$UL,0.01)
 table2e <- table2e[,-2] #remove SE column
 table2e[1, c(1,2,3)] <- c("Reference","","") #rename Q1 as reference
-row.names(table2e)[1] <- "COPD Quintile 1" #rename row 1
-row.names(table2e)[2] <- "COPD Quintile 2" #rename row 2
-row.names(table2e)[3] <- "COPD Quintile 3" #rename row 3
-row.names(table2e)[4] <- "COPD Quintile 4" #rename row 4
-row.names(table2e)[5] <- "COPD Quintile 5" #rename row 5
+row.names(table2e)[1] <- "Smoker Quintile 1" #rename row 1
+row.names(table2e)[2] <- "Smoker Quintile 2" #rename row 2
+row.names(table2e)[3] <- "Smoker Quintile 3" #rename row 3
+row.names(table2e)[4] <- "Smoker Quintile 4" #rename row 4
+row.names(table2e)[5] <- "Smoker Quintile 5" #rename row 5
 
 
-# By DM quintile
-summary(m1 <- glm(items.per.1000 ~ prop.dm.quintile, family="quasipoisson", data=data_all))
-cov.m1 <- vcovHC(m1, type="HC0")
-std.err <- sqrt(diag(cov.m1))
-r.est <- cbind(Estimate= coef(m1), "Robust SE" = std.err,
-               "Pr(>|z|)" = 2 * pnorm(abs(coef(m1)/std.err), lower.tail=FALSE),
-               LL = coef(m1) - 1.96 * std.err,
-               UL = coef(m1) + 1.96 * std.err)
-s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4), ~ exp(x5)), 
-                 coef(m1), cov.m1)
-rexp.est <- exp(r.est[, -3]) 
-rexp.est[, "Robust SE"] <- s 
-rexp.est
-table2f <- as.data.frame(rexp.est) #ready to save
-table2f$Estimate <- round_any(table2f$Estimate,0.01) #round to 2dp
-table2f$LL <- round_any(table2f$LL,0.01)
-table2f$UL <- round_any(table2f$UL,0.01)
-table2f <- table2f[,-2] #remove SE column
-table2f[1, c(1,2,3)] <- c("Reference","","") #rename Q1 as reference
-row.names(table2f)[1] <- "Diabetes Quintile 1" #rename row 1
-row.names(table2f)[2] <- "Diabetes Quintile 2" #rename row 2
-row.names(table2f)[3] <- "Diabetes Quintile 3" #rename row 3
-row.names(table2f)[4] <- "Diabetes Quintile 4" #rename row 4
-row.names(table2f)[5] <- "Diabetes Quintile 5" #rename row 5
-
-
-
-# By HF quintile
-summary(m1 <- glm(items.per.1000 ~ prop.hf.quintile, family="quasipoisson", data=data_all))
-cov.m1 <- vcovHC(m1, type="HC0")
-std.err <- sqrt(diag(cov.m1))
-r.est <- cbind(Estimate= coef(m1), "Robust SE" = std.err,
-               "Pr(>|z|)" = 2 * pnorm(abs(coef(m1)/std.err), lower.tail=FALSE),
-               LL = coef(m1) - 1.96 * std.err,
-               UL = coef(m1) + 1.96 * std.err)
-s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4), ~ exp(x5)), 
-                 coef(m1), cov.m1)
-rexp.est <- exp(r.est[, -3]) 
-rexp.est[, "Robust SE"] <- s 
-rexp.est
-table2g <- as.data.frame(rexp.est) #ready to save
-table2g$Estimate <- round_any(table2g$Estimate,0.01) #round to 2dp
-table2g$LL <- round_any(table2g$LL,0.01)
-table2g$UL <- round_any(table2g$UL,0.01)
-table2g <- table2g[,-2] #remove SE column
-table2g[1, c(1,2,3)] <- c("Reference","","") #rename Q1 as reference
-row.names(table2g)[1] <- "Heart failure Quintile 1" #rename row 1
-row.names(table2g)[2] <- "Heart failure Quintile 2" #rename row 2
-row.names(table2g)[3] <- "Heart failure Quintile 3" #rename row 3
-row.names(table2g)[4] <- "Heart failure Quintile 4" #rename row 4
-row.names(table2g)[5] <- "Heart failure Quintile 5" #rename row 5
 
 # save univariate regression results
-table2 <- rbind(table2a, table2b, table2c, table2d, table2e, table2f, table2g) # Combine results tables
+table2 <- rbind(table2a, table2b, table2c, table2d, table2e) # Combine results tables
 write.csv(table2,"Table 2. Results of univariate regression.csv",row.names = T)
 
 ## Multivariate
 
-summary(m1 <- glm(items.per.1000 ~ imd.quintile + total.listsize.quintile + prop.females.quintile + prop.older.quintile,  family="quasipoisson", data=data_all))
+summary(m1 <- glm(items.per.1000 ~ imd.quintile + total.listsize.quintile + prop.females.quintile + prop.older.quintile + prop.smoker.quintile, family="quasipoisson", data=data_all))
 
 cov.m1 <- vcovHC(m1, type="HC0")
 std.err <- sqrt(diag(cov.m1))
@@ -560,7 +472,7 @@ r.est <- cbind(Estimate= coef(m1), "Robust SE" = std.err,
                "Pr(>|z|)" = 2 * pnorm(abs(coef(m1)/std.err), lower.tail=FALSE),
                LL = coef(m1) - 1.96 * std.err,
                UL = coef(m1) + 1.96 * std.err)
-s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4), ~ exp(x5), ~ exp(x6), ~ exp(x7), ~ exp(x8), ~ exp(x9), ~ exp(x10), ~ exp(x11), ~ exp(x12), ~ exp(x13), ~ exp(x14), ~ exp(x15), ~ exp(x16), ~ exp(x17)), 
+s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4), ~ exp(x5), ~ exp(x6), ~ exp(x7), ~ exp(x8), ~ exp(x9), ~ exp(x10), ~ exp(x11), ~ exp(x12), ~ exp(x13), ~ exp(x14), ~ exp(x15), ~ exp(x16), ~ exp(x17), ~ exp(x18), ~ exp(x19), ~ exp(x20), ~ exp(x21)), 
                  coef(m1), cov.m1)
 rexp.est <- exp(r.est[, -3]) 
 rexp.est[, "Robust SE"] <- s 
@@ -572,7 +484,7 @@ table3$UL <- round_any(table3$UL,0.01)
 table3 <- table3[,-2] #remove SE column
 table3[1, c(1,2,3)] <- c("Reference","","") #rename Q1 as reference
 ref <- data.frame(Estimate="Reference",LL="",UL="") #Create a row for reference
-table3 <- rbind(table3[1:5,],ref,table3[6:9,],ref,table3[10:13,],ref,table3[14:17,])
+table3 <- rbind(table3[1:5,],ref,table3[6:9,],ref,table3[10:13,],ref,table3[14:17,], ref, table3[18:21,])
 row.names(table3)[1] <- "IMD Quintile 1" # Rename rows
 row.names(table3)[2] <- "IMD Quintile 2"
 row.names(table3)[3] <- "IMD Quintile 3"
@@ -593,77 +505,13 @@ row.names(table3)[17] <- "Older age Quintile 2"
 row.names(table3)[18] <- "Older age Quintile 3" 
 row.names(table3)[19] <- "Older age Quintile 4" 
 row.names(table3)[20] <- "Older age Quintile 5" 
+row.names(table3)[21] <- "Smokers Quintile 1" 
+row.names(table3)[22] <- "Smokers Quintile 2" 
+row.names(table3)[23] <- "Smokers Quintile 3" 
+row.names(table3)[24] <- "Smokers Quintile 4" 
+row.names(table3)[25] <- "Smokers Quintile 5" 
 
 
 # save multivariate regression results
 write.csv(table3,"Table 3. Results of multivariate regression.csv",row.names = T)
 
-
-# ## Calculate correlations and plot - prescribing by practice
-# 
-# df <- data_all # make name shorter to make coding for plots easier!
-# 
-# # correlation tests
-# test1 <- cor.test(df$imd.score, df$items.per.1000, method = "spearman") # test for QUANTITY/1000 vs IMD = test2
-# peeVal <- as.numeric(test1$`p.value`) # extract p value
-# if(peeVal<0.001){peeVal="p < 0.001"} #set p value ranges
-# if(peeVal<0.01 && peeVal>=0.001){peeVal="p < 0.01"}
-# #if(peeVal>=0.01){peeVal=round_any(peeVal,0.01, f=round)}
-# corVal <- round_any(as.numeric(test1$estimate),0.01,f=round)
-# equals <- " = "
-# 
-# #set max y limit
-# if(max(df$items.per.1000)<150){   # set upper y-axis limit to nearest 10 if highest number is <150
-#   maxy=round_any(max(df$items.per.1000), 10, f = ceiling)
-# }
-# 
-# if(max(df$items.per.1000)>=150 && max(df$items.per.1000)<=1500){   # set upper y-axis limit to nearest 100 if highest number is <1500
-#   maxy=round_any(max(df$items.per.1000), 100, f = ceiling)
-# }
-# 
-# if(max(df$items.per.1000)>1500){   # set upper y-axis limit to nearest 100 if highest number is >1500
-#   maxy=round_any(max(df$items.per.1000), 1000, f = ceiling)
-# }
-# 
-# Cairo(file="Figure 2. Scatterplot of prescribing rate vs IMD score.png", 
-#       type="png",
-#       units="in", 
-#       width=5, 
-#       height=4, 
-#       pointsize=4, 
-#       dpi=1200)
-# 
-# ggplot(df, aes(imd.score, items.per.1000))+
-#   geom_point(size=0.5, stroke=0) + labs(x = "\nPractice IMD Score (2019)", y = "Items prescribed\nper 1000 registered females (15 to 54 years)\n")+
-#   geom_smooth(method="lm", size=0.3)+
-#   theme(text = element_text(size = 20))+
-#   xlim(0,80)+
-#   ylim(0,maxy)+
-#   annotate(x=70, y=0.9*maxy, 
-#            label=as.expression(bquote(rho == .(corVal))), 
-#            geom="text", size=4)+
-#   annotate(x=70, y=0.83*maxy, 
-#            label=paste(peeVal), 
-#            geom="text", size=4)+
-#   theme(plot.title = element_text(hjust = 0.5, size = 12), axis.text = element_text(size = 10), axis.title = element_text(size= 10))
-# 
-# dev.off()
-# 
-
-
-
-# ## OpenData API [from https://github.com/nhsbsa-data-analytics/open-data-portal-api/blob/master/open-data-portal-api.R] -------------
-# 
-# # Define the url for the API call
-# base_endpoint <- "https://opendata.nhsbsa.net/api/3/action/"
-# package_list_method <- "package_list"     # List of data-sets in the portal
-# package_show_method <- "package_show?id=" # List all resources of a data-set
-# action_method <- "datastore_search_sql?"  # SQL action method
-# 
-# # Send API call to get list of data-sets
-# datasets_response <- jsonlite::fromJSON(paste0(
-#   base_endpoint, 
-#   package_list_method
-# ))
-# 
-# datasets_response$result # show datasets available
