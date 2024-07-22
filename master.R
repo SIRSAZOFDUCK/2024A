@@ -35,7 +35,7 @@ library(stringr)
 
 # Select BNF codes for analysis
 setwd(path.project) # Select project folder
-keep <- read.csv("bnf_codes.csv") # Read in BNF codes, from https://applications.nhsbsa.nhs.uk/infosystems/data/showDataSelector.do?reportId=126
+keep <- read.csv("bnf_codes_all.csv") # Read in BNF codes, from https://applications.nhsbsa.nhs.uk/infosystems/data/showDataSelector.do?reportId=126
 keep <- as.vector(keep$bnf_code) # List as vector
 
 # Set working directory
@@ -496,7 +496,7 @@ row.names(table3)[8] <- "List size Quintile 3"
 row.names(table3)[9] <- "List size Quintile 4" 
 row.names(table3)[10] <- "List size Quintile 5" 
 row.names(table3)[11] <- "Females Quintile 1" 
-row.names(table3)[12] <- "Femalese Quintile 2" 
+row.names(table3)[12] <- "Females Quintile 2" 
 row.names(table3)[13] <- "Females Quintile 3" 
 row.names(table3)[14] <- "Females Quintile 4" 
 row.names(table3)[15] <- "Females Quintile 5" 
