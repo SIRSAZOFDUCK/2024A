@@ -173,7 +173,7 @@ missing.listsize2 <- data_all %>% filter(items>=10) %>% filter(!is.na(imd.score)
 
 # Remove rows with missing data or low prescribing numbers 
 data_all <- data_all %>% 
-  # Remove rows with <50 items prescribed
+  # Remove rows with <10 items prescribed
   filter(items >= 10) %>%
   # Remove rows with no IMD value
   filter(!is.na(imd.score)) %>%
